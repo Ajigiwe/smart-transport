@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -279,7 +280,6 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen>
     return GestureDetector(
       onTap: () {
         _mapController.move(_pickupLocation, 15);
-        }
       },
       child: Container(
         width: 44,
@@ -412,7 +412,6 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen>
           ],
         ),
       ));
-    }
 
     // Driver marker (bus icon with bounce animation)
     final status = _hail?['status'] ?? 'searching';
@@ -751,7 +750,7 @@ class _TrianglePainter extends CustomPainter {
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.fill;
-    final path = Path()
+    final path = ui.Path()
       ..moveTo(0, 0)
       ..lineTo(size.width, 0)
       ..lineTo(size.width / 2, size.height)

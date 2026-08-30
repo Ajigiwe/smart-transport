@@ -16,6 +16,7 @@ import 'trip_booking_screen.dart';
 import 'trip_history_screen.dart';
 import 'profile_screen.dart';
 import 'hail_ride_screen.dart';
+import 'active_trip_screen.dart';
 
 final _apiClient = ApiClient();
 
@@ -604,6 +605,18 @@ class _TrackTabState extends State<_TrackTab> {
               text: 'Cancel',
               onPressed: _cancelHail,
               backgroundColor: AppColors.error,
+            ),
+          if (status == 'accepted' || status == 'in_progress')
+            PrimaryButton(
+              text: 'Open Live Map',
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => ActiveTripScreen(hail: _activeHail!),
+                  ),
+                );
+              },
+              icon: Icons.map_outlined,
             ),
         ],
       ),

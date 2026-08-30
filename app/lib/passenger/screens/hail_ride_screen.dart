@@ -7,6 +7,7 @@ import '../../shared/widgets/primary_button.dart';
 import '../../shared/theme/app_colors.dart';
 import '../../shared/theme/app_spacing.dart';
 import '../../shared/theme/app_typography.dart';
+import 'active_trip_screen.dart';
 
 final _apiClient = ApiClient();
 
@@ -83,8 +84,19 @@ class _HailRideScreenState extends ConsumerState<HailRideScreen>
         final myHail = hails.where((h) => h['id'] == _activeHail!['id']).toList();
         if (myHail.isNotEmpty && mounted) {
           final updated = myHail.first;
-          if (updated['status'] != _activeHail!['status']) {
+          final oldStatus = _activeHail!['status'];
+          if (updated['status'] != oldStatus) {
             setState(() => _activeHail = updated);
+            // Navigate to map when driver accepts
+            if (updated['status'] == 'accepted' && mounted) {
+              _pollTimer?.cancel();
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (_) => ActiveTripScreen(hail: updated),
+                ),
+              );
+              return;
+            }
           }
           if (updated['status'] == 'cancelled' || updated['status'] == 'completed') {
             _pollTimer?.cancel();

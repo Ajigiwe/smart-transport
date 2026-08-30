@@ -93,12 +93,28 @@ class _TripHistoryScreenState extends ConsumerState<TripHistoryScreen> {
                 ),
               ],
             ),
-            child: Row(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
               children: [
                 _FilterChip(
                   label: 'All',
                   isSelected: _selectedFilter == 'all',
                   onTap: () => setState(() => _selectedFilter = 'all'),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                _FilterChip(
+                  label: 'Pending',
+                  isSelected: _selectedFilter == 'pending',
+                  onTap: () => setState(() => _selectedFilter = 'pending'),
+                  color: AppColors.warning,
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                _FilterChip(
+                  label: 'Confirmed',
+                  isSelected: _selectedFilter == 'confirmed',
+                  onTap: () => setState(() => _selectedFilter = 'confirmed'),
+                  color: AppColors.accent,
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 _FilterChip(
@@ -115,6 +131,7 @@ class _TripHistoryScreenState extends ConsumerState<TripHistoryScreen> {
                   color: AppColors.error,
                 ),
               ],
+              ),
             ),
           ),
           
@@ -236,8 +253,32 @@ class _TripHistoryCard extends StatelessWidget {
   
   @override
   Widget build(BuildContext context) {
-    final isCompleted = trip['status'] == 'completed';
-    
+    final status = trip['status'] ?? 'pending';
+    final isCompleted = status == 'completed';
+    final isCancelled = status == 'cancelled';
+
+    final Color statusColor;
+    final IconData statusIcon;
+    final String statusLabel;
+
+    if (isCompleted) {
+      statusColor = AppColors.success;
+      statusIcon = Icons.check_circle_outline;
+      statusLabel = 'Completed';
+    } else if (isCancelled) {
+      statusColor = AppColors.error;
+      statusIcon = Icons.cancel_outlined;
+      statusLabel = 'Cancelled';
+    } else if (status == 'confirmed') {
+      statusColor = AppColors.accent;
+      statusIcon = Icons.schedule;
+      statusLabel = 'Confirmed';
+    } else {
+      statusColor = AppColors.warning;
+      statusIcon = Icons.hourglass_empty;
+      statusLabel = 'Pending';
+    }
+
     return AppCard(
       onTap: onTap,
       child: Column(
@@ -249,14 +290,12 @@ class _TripHistoryCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(AppSpacing.sm),
                 decoration: BoxDecoration(
-                  color: isCompleted
-                      ? AppColors.success.withOpacity(0.1)
-                      : AppColors.error.withOpacity(0.1),
+                  color: statusColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(AppSpacing.radiusSmall),
                 ),
                 child: Icon(
-                  isCompleted ? Icons.check_circle_outline : Icons.cancel_outlined,
-                  color: isCompleted ? AppColors.success : AppColors.error,
+                  statusIcon,
+                  color: statusColor,
                   size: AppSpacing.iconMedium,
                 ),
               ),
@@ -289,15 +328,13 @@ class _TripHistoryCard extends StatelessWidget {
                   vertical: AppSpacing.xs,
                 ),
                 decoration: BoxDecoration(
-                  color: isCompleted
-                      ? AppColors.success.withOpacity(0.1)
-                      : AppColors.error.withOpacity(0.1),
+                  color: statusColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(AppSpacing.radiusSmall),
                 ),
                 child: Text(
-                  isCompleted ? 'Completed' : 'Cancelled',
+                  statusLabel,
                   style: AppTypography.labelSmall.copyWith(
-                    color: isCompleted ? AppColors.success : AppColors.error,
+                    color: statusColor,
                   ),
                 ),
               ),

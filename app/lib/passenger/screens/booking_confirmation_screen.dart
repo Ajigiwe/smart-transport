@@ -6,7 +6,6 @@ import '../../shared/widgets/primary_button.dart';
 import '../../shared/theme/app_colors.dart';
 import '../../shared/theme/app_spacing.dart';
 import '../../shared/theme/app_typography.dart';
-import 'active_trip_screen.dart';
 
 final _apiClient = ApiClient();
 
@@ -99,14 +98,7 @@ class _BookingConfirmationScreenState extends ConsumerState<BookingConfirmationS
               text: 'Track Trip',
               onPressed: () {
                 Navigator.of(context).pop(); // Close dialog
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(
-                    builder: (_) => ActiveTripScreen(
-                      route: widget.route,
-                      trip: widget.trip,
-                    ),
-                  ),
-                );
+                Navigator.of(context).popUntil((route) => route.isFirst);
               },
             ),
             const SizedBox(height: AppSpacing.sm),

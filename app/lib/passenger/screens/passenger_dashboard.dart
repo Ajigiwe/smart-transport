@@ -12,7 +12,6 @@ import '../../shared/screens/login_screen.dart';
 import '../../shared/widgets/primary_button.dart';
 import '../../shared/widgets/loading_route.dart';
 import 'route_list_screen.dart';
-import 'active_trip_screen.dart';
 import 'trip_booking_screen.dart';
 import 'trip_history_screen.dart';
 import 'profile_screen.dart';

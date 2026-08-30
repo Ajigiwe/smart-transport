@@ -37,7 +37,8 @@ app = FastAPI(
     title="SmartTransport GH",
     description="Public Transport Management System API",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    redirect_slashes=False
 )
 
 # ============================================================================

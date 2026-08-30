@@ -61,6 +61,8 @@ class ApiClient {
           baseUrl: baseUrl ?? _baseUrl,
           connectTimeout: const Duration(seconds: 60),
           receiveTimeout: const Duration(seconds: 60),
+          followRedirects: true,
+          maxRedirects: 5,
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
@@ -76,7 +78,7 @@ class ApiClient {
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
           }
-          // Ensure trailing slash to avoid 307 redirects from FastAPI
+          // Ensure trailing slash to match FastAPI route definitions
           final path = options.path;
           if (path.isNotEmpty && !path.endsWith('/') && !path.contains('?')) {
             options.path = '$path/';
@@ -92,7 +94,7 @@ class ApiClient {
         },
         onError: (error, handler) async {
           // ignore: avoid_print
-          print('[ApiClient] ERROR: ${error.type} ${error.requestOptions.uri} ${error.message}');
+          print('[ApiClient] ERROR: ${error.type} ${error.requestOptions.uri} ${error.response?.statusCode} ${error.message}');
           if (error.response?.statusCode == 401) {
             await clearTokens();
           }

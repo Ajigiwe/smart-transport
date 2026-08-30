@@ -78,11 +78,7 @@ class ApiClient {
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
           }
-          // Ensure trailing slash to match FastAPI route definitions
-          final path = options.path;
-          if (path.isNotEmpty && !path.endsWith('/') && !path.contains('?')) {
-            options.path = '$path/';
-          }
+
           // ignore: avoid_print
           print('[ApiClient] ${options.method} ${options.uri}');
           handler.next(options);
@@ -93,6 +89,21 @@ class ApiClient {
           handler.next(response);
         },
         onError: (error, handler) async {
+          // Follow 307 redirects — Dio doesn't follow them for POST requests
+          if (error.response?.statusCode == 307 || error.response?.statusCode == 308) {
+            final redirectUrl = error.response?.headers.value('location');
+            if (redirectUrl != null) {
+              try {
+                final redirectResponse = await _dio.fetch(RequestOptions(
+                  path: redirectUrl.startsWith('http') ? redirectUrl : redirectUrl,
+                  method: error.requestOptions.method,
+                  data: error.requestOptions.data,
+                  headers: Map<String, dynamic>.from(error.requestOptions.headers),
+                ));
+                return handler.resolve(redirectResponse);
+              } catch (_) {}
+            }
+          }
           // ignore: avoid_print
           print('[ApiClient] ERROR: ${error.type} ${error.requestOptions.uri} ${error.response?.statusCode} ${error.message}');
           if (error.response?.statusCode == 401) {

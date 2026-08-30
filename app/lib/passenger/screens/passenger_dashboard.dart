@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../shared/services/auth_provider.dart';
@@ -409,9 +410,74 @@ class _PassengerDashboardState extends ConsumerState<PassengerDashboard>
   }
 
   Widget _buildTrackTab() {
-    return Center(
-      child: FadeSlideIn(
-        delay: const Duration(milliseconds: 200),
+    return _TrackTab(apiClient: _apiClient);
+  }
+
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning ☀️';
+    if (hour < 17) return 'Good afternoon 🌤️';
+    return 'Good evening 🌙';
+  }
+}
+
+/// Track Tab — shows active hail with live status
+class _TrackTab extends StatefulWidget {
+  final ApiClient apiClient;
+  const _TrackTab({required this.apiClient});
+
+  @override
+  State<_TrackTab> createState() => _TrackTabState();
+}
+
+class _TrackTabState extends State<_TrackTab> {
+  Map<String, dynamic>? _activeHail;
+  bool _isLoading = true;
+  Timer? _refreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadActiveHail();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 5), (_) => _loadActiveHail());
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadActiveHail() async {
+    try {
+      final hails = await widget.apiClient.getMyHails();
+      final active = hails.where((h) =>
+          h['status'] == 'searching' || h['status'] == 'accepted' || h['status'] == 'in_progress').toList();
+      if (mounted) {
+        setState(() {
+          _activeHail = active.isNotEmpty ? active.first : null;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _cancelHail() async {
+    if (_activeHail == null) return;
+    try {
+      await widget.apiClient.cancelHail(_activeHail!['id']);
+      setState(() => _activeHail = null);
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) return const Center(child: CircularProgressIndicator());
+
+    if (_activeHail == null) {
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -421,42 +487,148 @@ class _PassengerDashboardState extends ConsumerState<PassengerDashboard>
                 color: AppColors.ghanaRed.withOpacity(0.08),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.location_on_rounded,
-                size: 56,
-                color: AppColors.ghanaRed,
-              ),
+              child: const Icon(Icons.location_on_rounded, size: 56, color: AppColors.ghanaRed),
             ),
             const SizedBox(height: AppSpacing.lg),
-            const Text(
-              'No Active Trip',
-              style: AppTypography.h3,
-            ),
+            const Text('No Active Trip', style: AppTypography.h3),
             const SizedBox(height: AppSpacing.sm),
-            Text(
-              'Book a trip to see live tracking',
-              style: AppTypography.bodyMedium.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
+            Text('Hail a ride to see live tracking',
+              style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondary)),
             const SizedBox(height: AppSpacing.xl),
             PrimaryButton(
               text: 'Hail a Ride',
-              onPressed: () => _onNavTap(1),
+              onPressed: () {
+                final dashboard = context.findAncestorStateOfType<State>();
+                if (dashboard != null && dashboard is _PassengerDashboardState) {
+                  dashboard._onNavTap(1);
+                }
+              },
               isExpanded: false,
               icon: Icons.local_taxi_rounded,
             ),
           ],
         ),
+      );
+    }
+
+    final status = _activeHail!['status'] ?? 'searching';
+    final Color statusColor;
+    final String statusLabel;
+    final IconData statusIcon;
+
+    switch (status) {
+      case 'accepted':
+        statusColor = AppColors.success;
+        statusLabel = 'Driver is on the way';
+        statusIcon = Icons.directions_car;
+        break;
+      case 'in_progress':
+        statusColor = AppColors.accent;
+        statusLabel = 'Trip in progress';
+        statusIcon = Icons.directions_bus;
+        break;
+      default:
+        statusColor = AppColors.warning;
+        statusLabel = 'Searching for driver...';
+        statusIcon = Icons.search;
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(AppSpacing.screenPaddingHorizontal),
+      child: Column(
+        children: [
+          const SizedBox(height: AppSpacing.xl),
+          // Status header
+          Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              color: statusColor.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(statusIcon, size: 50, color: statusColor),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(statusLabel, style: AppTypography.h3),
+          const SizedBox(height: AppSpacing.xl),
+
+          // Trip card
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _TrackRow(icon: Icons.circle, iconColor: AppColors.success,
+                    label: 'From', value: _activeHail!['pickup_location'] ?? ''),
+                Padding(
+                  padding: const EdgeInsets.only(left: 10),
+                  child: Container(width: 2, height: 20, color: AppColors.border),
+                ),
+                _TrackRow(icon: Icons.location_on, iconColor: AppColors.error,
+                    label: 'To', value: _activeHail!['destination'] ?? ''),
+                const SizedBox(height: AppSpacing.md),
+                _TrackRow(icon: Icons.people_outline, iconColor: AppColors.accent,
+                    label: 'Passengers', value: '${_activeHail!['passengers_count'] ?? 1}'),
+              ],
+            ),
+          ),
+
+          if (status == 'accepted' || status == 'in_progress') ...[
+            const SizedBox(height: AppSpacing.md),
+            AppCard(
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: AppColors.success.withOpacity(0.1),
+                    child: const Icon(Icons.person, color: AppColors.success),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(_activeHail!['driver_name'] ?? 'Driver',
+                            style: AppTypography.bodyLarge.copyWith(fontWeight: FontWeight.w600)),
+                        Text(_activeHail!['driver_plate'] ?? '',
+                            style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          const SizedBox(height: AppSpacing.xl),
+          if (status == 'searching')
+            PrimaryButton(
+              text: 'Cancel',
+              onPressed: _cancelHail,
+              backgroundColor: AppColors.error,
+            ),
+        ],
       ),
     );
   }
+}
 
-  String _getGreeting() {
-    final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good morning ☀️';
-    if (hour < 17) return 'Good afternoon 🌤️';
-    return 'Good evening 🌙';
+class _TrackRow extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+  final String value;
+  const _TrackRow({required this.icon, required this.iconColor, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: iconColor),
+        const SizedBox(width: AppSpacing.sm),
+        Text('$label: ', style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary)),
+        Expanded(child: Text(value, style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w500))),
+      ],
+    );
   }
 }
 

@@ -8,65 +8,43 @@ import '../../shared/theme/app_typography.dart';
 
 final _apiClient = ApiClient();
 
-/// SmartTransport GH Trip History Screen
+/// Passenger Trip History — shows all hail rides
 class TripHistoryScreen extends ConsumerStatefulWidget {
   const TripHistoryScreen({Key? key}) : super(key: key);
-  
+
   @override
   ConsumerState<TripHistoryScreen> createState() => _TripHistoryScreenState();
 }
 
 class _TripHistoryScreenState extends ConsumerState<TripHistoryScreen> {
-  List<Map<String, dynamic>> _trips = [];
+  List<Map<String, dynamic>> _hails = [];
   bool _isLoading = false;
   String _selectedFilter = 'all';
-  
+
   @override
   void initState() {
     super.initState();
-    _loadTripHistory();
+    _loadHistory();
   }
-  
-  Future<void> _loadTripHistory() async {
+
+  Future<void> _loadHistory() async {
     setState(() => _isLoading = true);
     try {
-      final bookings = await _apiClient.getBookings();
-      _trips = bookings.map<Map<String, dynamic>>((b) {
-        final status = b['status'] ?? 'pending';
-        return {
-          'id': b['id'],
-          'route_name': 'Trip #${b['trip_id']}',
-          'driver_name': 'Driver',
-          'date': b['requested_at'] != null ? b['requested_at'].toString().substring(0, 10) : 'N/A',
-          'time': b['requested_at'] != null ? b['requested_at'].toString().substring(11, 16) : 'N/A',
-          'fare': 0.0,
-          'status': status,
-          'passengers': 1,
-        };
-      }).toList();
-      // Enrich with trip details
-      for (var trip in _trips) {
-        try {
-          final details = await _apiClient.getTripDetails(trip['id'] ?? 0);
-          if (details['route'] != null) {
-            trip['route_name'] = details['route']['name'] ?? trip['route_name'];
-          }
-          if (details['driver'] != null) {
-            trip['driver_name'] = details['driver']['name'] ?? trip['driver_name'];
-          }
-        } catch (_) {}
+      final hails = await _apiClient.getMyHails();
+      if (mounted) {
+        setState(() => _hails = hails.cast<Map<String, dynamic>>());
       }
     } catch (e) {
-      _trips = [];
+      if (mounted) setState(() => _hails = []);
     }
-    setState(() => _isLoading = false);
+    if (mounted) setState(() => _isLoading = false);
   }
-  
-  List<Map<String, dynamic>> get _filteredTrips {
-    if (_selectedFilter == 'all') return _trips;
-    return _trips.where((trip) => trip['status'] == _selectedFilter).toList();
+
+  List<Map<String, dynamic>> get _filteredHails {
+    if (_selectedFilter == 'all') return _hails;
+    return _hails.where((h) => h['status'] == _selectedFilter).toList();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -77,7 +55,7 @@ class _TripHistoryScreenState extends ConsumerState<TripHistoryScreen> {
       ),
       body: Column(
         children: [
-          // Filter Chips
+          // Filter chips
           Container(
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.screenPaddingHorizontal,
@@ -86,207 +64,165 @@ class _TripHistoryScreenState extends ConsumerState<TripHistoryScreen> {
             decoration: const BoxDecoration(
               color: AppColors.surface,
               boxShadow: [
-                BoxShadow(
-                  color: AppColors.shadow,
-                  blurRadius: 4,
-                  offset: Offset(0, 2),
-                ),
+                BoxShadow(color: AppColors.shadow, blurRadius: 4, offset: Offset(0, 2)),
               ],
             ),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
-              children: [
-                _FilterChip(
-                  label: 'All',
-                  isSelected: _selectedFilter == 'all',
-                  onTap: () => setState(() => _selectedFilter = 'all'),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                _FilterChip(
-                  label: 'Pending',
-                  isSelected: _selectedFilter == 'pending',
-                  onTap: () => setState(() => _selectedFilter = 'pending'),
-                  color: AppColors.warning,
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                _FilterChip(
-                  label: 'Confirmed',
-                  isSelected: _selectedFilter == 'confirmed',
-                  onTap: () => setState(() => _selectedFilter = 'confirmed'),
-                  color: AppColors.accent,
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                _FilterChip(
-                  label: 'Completed',
-                  isSelected: _selectedFilter == 'completed',
-                  onTap: () => setState(() => _selectedFilter = 'completed'),
-                  color: AppColors.success,
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                _FilterChip(
-                  label: 'Cancelled',
-                  isSelected: _selectedFilter == 'cancelled',
-                  onTap: () => setState(() => _selectedFilter = 'cancelled'),
-                  color: AppColors.error,
-                ),
-              ],
+                children: [
+                  _FilterChip(label: 'All', count: _hails.length,
+                      isSelected: _selectedFilter == 'all',
+                      onTap: () => setState(() => _selectedFilter = 'all')),
+                  const SizedBox(width: AppSpacing.sm),
+                  _FilterChip(label: 'Completed', count: _hails.where((h) => h['status'] == 'completed').length,
+                      isSelected: _selectedFilter == 'completed',
+                      onTap: () => setState(() => _selectedFilter = 'completed'),
+                      color: AppColors.success),
+                  const SizedBox(width: AppSpacing.sm),
+                  _FilterChip(label: 'Cancelled', count: _hails.where((h) => h['status'] == 'cancelled').length,
+                      isSelected: _selectedFilter == 'cancelled',
+                      onTap: () => setState(() => _selectedFilter = 'cancelled'),
+                      color: AppColors.error),
+                ],
               ),
             ),
           ),
-          
-          // Trip List
+
+          // List
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _filteredTrips.isEmpty
+                : _filteredHails.isEmpty
                     ? _buildEmptyState()
-                    : _buildTripList(),
+                    : RefreshIndicator(
+                        onRefresh: _loadHistory,
+                        child: ListView.builder(
+                          padding: const EdgeInsets.all(AppSpacing.sm),
+                          itemCount: _filteredHails.length,
+                          itemBuilder: (context, index) => _HailHistoryCard(
+                            hail: _filteredHails[index],
+                          ),
+                        ),
+                      ),
           ),
         ],
       ),
     );
   }
-  
+
   Widget _buildEmptyState() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
-            Icons.history_outlined,
-            size: 64,
-            color: AppColors.textTertiary,
-          ),
+          const Icon(Icons.history_outlined, size: 64, color: AppColors.textTertiary),
           const SizedBox(height: AppSpacing.md),
-          Text(
-            'No trips found',
-            style: AppTypography.h4.copyWith(
-              color: AppColors.textSecondary,
-            ),
-          ),
+          Text('No trips yet', style: AppTypography.h4.copyWith(color: AppColors.textSecondary)),
           const SizedBox(height: AppSpacing.sm),
-          Text(
-            'Your trip history will appear here',
-            style: AppTypography.bodySmall,
-          ),
+          Text('Your ride history will appear here', style: AppTypography.bodySmall),
         ],
       ),
     );
   }
-  
-  Widget _buildTripList() {
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(
-        vertical: AppSpacing.sm,
-      ),
-      itemCount: _filteredTrips.length,
-      itemBuilder: (context, index) {
-        final trip = _filteredTrips[index];
-        return _TripHistoryCard(
-          trip: trip,
-          onTap: () {
-            // TODO: Show trip details
-          },
-        );
-      },
-    );
-  }
 }
 
-/// Filter Chip Widget
 class _FilterChip extends StatelessWidget {
   final String label;
+  final int count;
   final bool isSelected;
   final VoidCallback onTap;
   final Color? color;
-  
+
   const _FilterChip({
     required this.label,
+    required this.count,
     required this.isSelected,
     required this.onTap,
     this.color,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.sm,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
         decoration: BoxDecoration(
-          color: isSelected
-              ? (color ?? AppColors.accent).withOpacity(0.1)
-              : AppColors.background,
+          color: isSelected ? (color ?? AppColors.accent).withOpacity(0.1) : AppColors.background,
           borderRadius: BorderRadius.circular(AppSpacing.radiusFull),
-          border: Border.all(
-            color: isSelected
-                ? (color ?? AppColors.accent)
-                : AppColors.border,
-          ),
+          border: Border.all(color: isSelected ? (color ?? AppColors.accent) : AppColors.border),
         ),
-        child: Text(
-          label,
-          style: AppTypography.labelMedium.copyWith(
-            color: isSelected
-                ? (color ?? AppColors.accent)
-                : AppColors.textSecondary,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label, style: AppTypography.labelMedium.copyWith(
+              color: isSelected ? (color ?? AppColors.accent) : AppColors.textSecondary,
+            )),
+            if (count > 0) ...[
+              const SizedBox(width: AppSpacing.xs),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isSelected ? (color ?? AppColors.accent) : AppColors.textTertiary.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text('$count', style: AppTypography.labelSmall.copyWith(
+                  color: isSelected ? Colors.white : AppColors.textTertiary,
+                )),
+              ),
+            ],
+          ],
         ),
       ),
     );
   }
 }
 
-/// Trip History Card Widget
-class _TripHistoryCard extends StatelessWidget {
-  final Map<String, dynamic> trip;
-  final VoidCallback onTap;
-  
-  const _TripHistoryCard({
-    required this.trip,
-    required this.onTap,
-  });
-  
+class _HailHistoryCard extends StatelessWidget {
+  final Map<String, dynamic> hail;
+
+  const _HailHistoryCard({required this.hail});
+
   @override
   Widget build(BuildContext context) {
-    final status = trip['status'] ?? 'pending';
-    final isCompleted = status == 'completed';
-    final isCancelled = status == 'cancelled';
-
+    final status = hail['status'] ?? 'searching';
     final Color statusColor;
-    final IconData statusIcon;
     final String statusLabel;
 
-    if (isCompleted) {
-      statusColor = AppColors.success;
-      statusIcon = Icons.check_circle_outline;
-      statusLabel = 'Completed';
-    } else if (isCancelled) {
-      statusColor = AppColors.error;
-      statusIcon = Icons.cancel_outlined;
-      statusLabel = 'Cancelled';
-    } else if (status == 'confirmed') {
-      statusColor = AppColors.accent;
-      statusIcon = Icons.schedule;
-      statusLabel = 'Confirmed';
-    } else {
-      statusColor = AppColors.warning;
-      statusIcon = Icons.hourglass_empty;
-      statusLabel = 'Pending';
+    switch (status) {
+      case 'completed':
+        statusColor = AppColors.success;
+        statusLabel = 'Completed';
+        break;
+      case 'cancelled':
+        statusColor = AppColors.error;
+        statusLabel = 'Cancelled';
+        break;
+      case 'accepted':
+        statusColor = AppColors.accent;
+        statusLabel = 'Accepted';
+        break;
+      case 'in_progress':
+        statusColor = AppColors.warning;
+        statusLabel = 'In Progress';
+        break;
+      default:
+        statusColor = AppColors.textTertiary;
+        statusLabel = 'Searching';
     }
 
+    final createdAt = hail['created_at'] != null
+        ? hail['created_at'].toString().substring(0, 16).replaceAll('T', ' ')
+        : '';
+
     return AppCard(
-      onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              // Status Icon
+              // Status icon
               Container(
                 padding: const EdgeInsets.all(AppSpacing.sm),
                 decoration: BoxDecoration(
@@ -294,80 +230,58 @@ class _TripHistoryCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(AppSpacing.radiusSmall),
                 ),
                 child: Icon(
-                  statusIcon,
+                  status == 'completed'
+                      ? Icons.check_circle_outline
+                      : status == 'cancelled'
+                          ? Icons.cancel_outlined
+                          : Icons.directions_car,
                   color: statusColor,
                   size: AppSpacing.iconMedium,
                 ),
               ),
               const SizedBox(width: AppSpacing.md),
-              
-              // Route Info
+
+              // Route info
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      trip['route_name'],
-                      style: AppTypography.bodyLarge.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                      '${hail['pickup_location'] ?? ''} → ${hail['destination'] ?? ''}',
+                      style: AppTypography.bodyLarge.copyWith(fontWeight: FontWeight.w600),
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: AppSpacing.xs),
                     Text(
-                      'Driver: ${trip['driver_name']}',
+                      hail['driver_name'] != null ? 'Driver: ${hail['driver_name']}' : 'No driver assigned',
                       style: AppTypography.bodySmall,
                     ),
                   ],
                 ),
               ),
-              
-              // Status Badge
+
+              // Status badge
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.sm,
-                  vertical: AppSpacing.xs,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
                 decoration: BoxDecoration(
                   color: statusColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(AppSpacing.radiusSmall),
                 ),
-                child: Text(
-                  statusLabel,
-                  style: AppTypography.labelSmall.copyWith(
-                    color: statusColor,
-                  ),
-                ),
+                child: Text(statusLabel, style: AppTypography.labelSmall.copyWith(color: statusColor)),
               ),
             ],
           ),
-          
           const SizedBox(height: AppSpacing.md),
-          
-          // Trip Details
+
+          // Details row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _TripDetail(
-                icon: Icons.calendar_today_outlined,
-                label: 'Date',
-                value: trip['date'],
-              ),
-              _TripDetail(
-                icon: Icons.access_time_outlined,
-                label: 'Time',
-                value: trip['time'],
-              ),
-              _TripDetail(
-                icon: Icons.people_outlined,
-                label: 'Passengers',
-                value: '${trip['passengers']}',
-              ),
-              _TripDetail(
-                icon: Icons.attach_money_outlined,
-                label: 'Fare',
-                value: 'GHS ${trip['fare'].toStringAsFixed(2)}',
-                isHighlight: true,
-              ),
+              _DetailItem(icon: Icons.calendar_today, value: createdAt.length > 10 ? createdAt.substring(0, 10) : createdAt),
+              _DetailItem(icon: Icons.access_time, value: createdAt.length > 10 ? createdAt.substring(11, 16) : ''),
+              _DetailItem(icon: Icons.people_outline, value: '${hail['passengers_count'] ?? 1} pax'),
+              if (hail['fare_estimate'] != null)
+                _DetailItem(icon: Icons.attach_money, value: 'GHS ${hail['fare_estimate']}', isHighlight: true),
             ],
           ),
         ],
@@ -376,43 +290,24 @@ class _TripHistoryCard extends StatelessWidget {
   }
 }
 
-/// Trip Detail Widget
-class _TripDetail extends StatelessWidget {
+class _DetailItem extends StatelessWidget {
   final IconData icon;
-  final String label;
   final String value;
   final bool isHighlight;
-  
-  const _TripDetail({
-    required this.icon,
-    required this.label,
-    required this.value,
-    this.isHighlight = false,
-  });
-  
+
+  const _DetailItem({required this.icon, required this.value, this.isHighlight = false});
+
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(
-          icon,
-          size: AppSpacing.iconSmall,
-          color: AppColors.textTertiary,
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        Text(
-          label,
-          style: AppTypography.labelSmall.copyWith(
-            color: AppColors.textTertiary,
-          ),
-        ),
-        Text(
-          value,
-          style: AppTypography.labelMedium.copyWith(
-            color: isHighlight ? AppColors.accent : AppColors.textPrimary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        Icon(icon, size: 14, color: AppColors.textTertiary),
+        const SizedBox(width: 4),
+        Text(value, style: AppTypography.labelSmall.copyWith(
+          color: isHighlight ? AppColors.accent : AppColors.textPrimary,
+          fontWeight: FontWeight.w600,
+        )),
       ],
     );
   }

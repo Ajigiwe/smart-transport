@@ -43,13 +43,18 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen>
   final LatLng _fallbackPickup = const LatLng(4.8989, -1.7600);
   final LatLng _fallbackDest = const LatLng(4.9050, -1.7550);
 
-  LatLng? get _pickupLocation => _hail?['pickup_lat'] != null
-      ? LatLng(_hail!['pickup_lat'], _hail!['pickup_lng'])
-      : _fallbackPickup;
+  LatLng get _pickupLocation {
+    if (_hail?['pickup_lat'] != null) return LatLng(_hail!['pickup_lat'], _hail!['pickup_lng']);
+    // Use different locations based on hail ID for variety
+    final id = _hail?['id'] ?? 1;
+    return LatLng(4.8989 + (id * 0.002), -1.7600 + (id * 0.003));
+  }
 
-  LatLng? get _destLocation => _hail?['destination_lat'] != null
-      ? LatLng(_hail!['destination_lat'], _hail!['destination_lng'])
-      : _fallbackDest;
+  LatLng get _destLocation {
+    if (_hail?['destination_lat'] != null) return LatLng(_hail!['destination_lat'], _hail!['destination_lng']);
+    final id = _hail?['id'] ?? 1;
+    return LatLng(4.9050 + (id * 0.001), -1.7550 + (id * 0.002));
+  }
 
   @override
   void initState() {
@@ -273,8 +278,7 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen>
   Widget _buildRecenterButton() {
     return GestureDetector(
       onTap: () {
-        if (_pickupLocation != null) {
-          _mapController.move(_pickupLocation!, 15);
+        _mapController.move(_pickupLocation, 15);
         }
       },
       child: Container(
@@ -297,31 +301,27 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen>
   }
 
   Widget _buildMap() {
-    final center = _pickupLocation ?? _fallbackPickup;
-
     return FlutterMap(
       mapController: _mapController,
       options: MapOptions(
-        center: center,
+        center: _pickupLocation,
         zoom: 15.0,
         interactionOptions: const InteractionOptions(
           flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
         ),
       ),
       children: [
-        // Premium map tiles (CartoDB Voyager — cleaner look)
+        // Map tiles
         TileLayer(
-          urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-          subdomains: const ['a', 'b', 'c', 'd'],
+          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
           userAgentPackageName: 'com.smarttransport.gh',
         ),
 
         // Route polyline
-        if (_pickupLocation != null && _destLocation != null)
-          PolylineLayer(
+        PolylineLayer(
             polylines: [
               Polyline(
-                points: [_pickupLocation!, _destLocation!],
+                points: [_pickupLocation, _destLocation],
                 color: AppColors.accent,
                 strokeWidth: 5.0,
                 isDotted: true,
@@ -338,12 +338,9 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen>
   }
 
   List<Marker> _buildMarkers() {
-    final markers = <Marker>[];
-
-    // Pickup marker (green dot with pulsing ring)
-    if (_pickupLocation != null) {
-      markers.add(Marker(
-        point: _pickupLocation!,
+    final markers = <Marker>[];        // Pickup marker (green dot with pulsing ring)
+    markers.add(Marker(
+        point: _pickupLocation,
         width: 60,
         height: 60,
         child: Stack(
@@ -381,12 +378,10 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen>
           ],
         ),
       ));
-    }
 
     // Destination marker (red pin)
-    if (_destLocation != null) {
-      markers.add(Marker(
-        point: _destLocation!,
+    markers.add(Marker(
+        point: _destLocation,
         width: 50,
         height: 50,
         child: Column(
@@ -421,7 +416,7 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen>
 
     // Driver marker (bus icon with bounce animation)
     final status = _hail?['status'] ?? 'searching';
-    if ((status == 'accepted' || status == 'in_progress') && _pickupLocation != null) {
+    if (status == 'accepted' || status == 'in_progress') {
       // Simulate driver moving towards pickup
       final driverPos = _getSimulatedDriverPosition();
       markers.add(Marker(
@@ -462,8 +457,8 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen>
 
   LatLng _getSimulatedDriverPosition() {
     // Simulate driver position moving towards pickup
-    final pickup = _pickupLocation ?? _fallbackPickup;
-    final dest = _destLocation ?? _fallbackDest;
+    final pickup = _pickupLocation;
+    final dest = _destLocation;
     final now = DateTime.now().second % 60;
     final progress = (now / 60.0).clamp(0.1, 0.9);
 

@@ -227,3 +227,43 @@ class DashboardStats(BaseModel):
     total_routes: int = 0
     total_passengers: int = 0
     total_vehicles: int = 0
+
+
+# ============================================================================
+# HailRequest Schemas
+# ============================================================================
+
+class HailCreate(BaseModel):
+    pickup_location: str
+    destination: str
+    pickup_lat: Optional[float] = None
+    pickup_lng: Optional[float] = None
+    destination_lat: Optional[float] = None
+    destination_lng: Optional[float] = None
+    passengers_count: int = 1
+
+
+class HailResponse(BaseModel):
+    id: int
+    passenger_id: int
+    driver_id: Optional[int] = None
+    pickup_location: str
+    destination: str
+    pickup_lat: Optional[float] = None
+    pickup_lng: Optional[float] = None
+    destination_lat: Optional[float] = None
+    destination_lng: Optional[float] = None
+    passengers_count: int
+    fare_estimate: Optional[float] = None
+    status: str
+    created_at: Optional[datetime] = None
+    accepted_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    passenger_name: Optional[str] = None
+    passenger_phone: Optional[str] = None
+    driver_name: Optional[str] = None
+    driver_phone: Optional[str] = None
+    driver_plate: Optional[str] = None
+
+    class Config:
+        from_attributes = True

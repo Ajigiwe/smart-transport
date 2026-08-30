@@ -15,6 +15,7 @@ import 'active_trip_screen.dart';
 import 'trip_booking_screen.dart';
 import 'trip_history_screen.dart';
 import 'profile_screen.dart';
+import 'hail_ride_screen.dart';
 
 final _apiClient = ApiClient();
 
@@ -110,8 +111,8 @@ class _PassengerDashboardState extends ConsumerState<PassengerDashboard>
                   onTap: () => _onNavTap(0),
                 ),
                 _NavItem(
-                  icon: Icons.explore_rounded,
-                  label: 'Routes',
+                  icon: Icons.local_taxi_rounded,
+                  label: 'Hail',
                   isActive: _currentIndex == 1,
                   onTap: () => _onNavTap(1),
                 ),
@@ -149,7 +150,7 @@ class _PassengerDashboardState extends ConsumerState<PassengerDashboard>
       case 0:
         return _buildHomeTab();
       case 1:
-        return const RouteListScreen();
+        return const HailRideScreen();
       case 2:
         return _buildTrackTab();
       case 3:
@@ -260,11 +261,10 @@ class _PassengerDashboardState extends ConsumerState<PassengerDashboard>
                     Expanded(
                       child: ScaleTap(
                         onTap: () => _onNavTap(1),
-                        child: _QuickActionCard(
-                          icon: Icons.explore_rounded,
-                          title: 'Find Routes',
-                          subtitle: 'Browse all routes',
-                          color: AppColors.ghanaGreen,
+                        child: _QuickActionCard(                           icon: Icons.local_taxi_rounded,
+                           title: 'Hail a Ride',
+                           subtitle: 'Find a nearby driver',
+                           color: AppColors.ghanaGreen,
                         ),
                       ),
                     ),
@@ -441,10 +441,10 @@ class _PassengerDashboardState extends ConsumerState<PassengerDashboard>
             ),
             const SizedBox(height: AppSpacing.xl),
             PrimaryButton(
-              text: 'Find Routes',
+              text: 'Hail a Ride',
               onPressed: () => _onNavTap(1),
               isExpanded: false,
-              icon: Icons.explore_rounded,
+              icon: Icons.local_taxi_rounded,
             ),
           ],
         ),

@@ -44,6 +44,33 @@ async def get_my_vehicle(
 
 
 # ============================================================================
+# Update My Vehicle (Driver)
+# ============================================================================
+
+@router.patch("/driver/me", response_model=VehicleResponse)
+async def update_my_vehicle(
+    update_data: VehicleUpdate,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(require_any_role)
+):
+    """Driver can update their own vehicle plate number and capacity."""
+    if current_user.role != UserRole.DRIVER:
+        raise HTTPException(status_code=403, detail="Only drivers can update their vehicle")
+    vehicle = session.exec(
+        select(Vehicle).where(Vehicle.driver_id == current_user.id)
+    ).first()
+    if not vehicle:
+        raise HTTPException(status_code=404, detail="No vehicle assigned to you")
+    update_dict = update_data.model_dump(exclude_unset=True)
+    for key, value in update_dict.items():
+        setattr(vehicle, key, value)
+    session.add(vehicle)
+    session.commit()
+    session.refresh(vehicle)
+    return vehicle
+
+
+# ============================================================================
 # List Vehicles (Admin: all, Driver: own)
 # ============================================================================
 

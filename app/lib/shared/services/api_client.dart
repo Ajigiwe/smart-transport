@@ -354,6 +354,45 @@ class ApiClient {
   }
 
   // ============================================================================
+  // Hail Endpoints
+  // ============================================================================
+
+  Future<Map<String, dynamic>> createHail(Map<String, dynamic> data) async {
+    final response = await _dio.post('/hails', data: data);
+    return response.data;
+  }
+
+  Future<List<dynamic>> getMyHails() async {
+    final response = await _dio.get('/hails/me');
+    return response.data;
+  }
+
+  Future<List<dynamic>> getAvailableHails() async {
+    final response = await _dio.get('/hails/available');
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> acceptHail(int hailId) async {
+    final response = await _dio.patch('/hails/$hailId/accept');
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> startHailTrip(int hailId) async {
+    final response = await _dio.patch('/hails/$hailId/start');
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> completeHailTrip(int hailId) async {
+    final response = await _dio.patch('/hails/$hailId/complete');
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> cancelHail(int hailId) async {
+    final response = await _dio.patch('/hails/$hailId/cancel');
+    return response.data;
+  }
+
+  // ============================================================================
   // Trip Details
   // ============================================================================
 

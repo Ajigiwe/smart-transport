@@ -42,6 +42,14 @@ class BookingStatus(str, Enum):
     COMPLETED = "completed"
 
 
+class HailStatus(str, Enum):
+    SEARCHING = "searching"    # Passenger waiting for a driver
+    ACCEPTED = "accepted"      # Driver accepted the hail
+    IN_PROGRESS = "in_progress" # Trip ongoing
+    COMPLETED = "completed"    # Trip finished
+    CANCELLED = "cancelled"
+
+
 # ============================================================================
 # User Model
 # ============================================================================
@@ -66,6 +74,10 @@ class User(SQLModel, table=True):
     trips_as_driver: List["Trip"] = Relationship(
         back_populates="driver",
         sa_relationship_kwargs={"foreign_keys": "[Trip.driver_id]"}
+    )
+    hails: List["HailRequest"] = Relationship(
+        back_populates="passenger",
+        sa_relationship_kwargs={"foreign_keys": "[HailRequest.passenger_id]"}
     )
 
 
@@ -174,3 +186,37 @@ class Booking(SQLModel, table=True):
     # Relationships
     trip: Trip = Relationship(back_populates="bookings")
     passenger: User = Relationship(back_populates="bookings")
+
+
+# ============================================================================
+# HailRequest Model
+# ============================================================================
+
+class HailRequest(SQLModel, table=True):
+    """Passenger ride hail — passenger requests a ride, nearby drivers accept."""
+    __tablename__ = "hail_requests"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    passenger_id: int = Field(foreign_key="users.id", index=True)
+    driver_id: Optional[int] = Field(default=None, foreign_key="users.id", index=True)
+    pickup_location: str = Field(max_length=200)
+    destination: str = Field(max_length=200)
+    pickup_lat: Optional[float] = Field(default=None)
+    pickup_lng: Optional[float] = Field(default=None)
+    destination_lat: Optional[float] = Field(default=None)
+    destination_lng: Optional[float] = Field(default=None)
+    passengers_count: int = Field(default=1)
+    fare_estimate: Optional[float] = Field(default=None)
+    status: HailStatus = Field(default=HailStatus.SEARCHING)
+    created_at: Optional[datetime] = Field(default=None, sa_column_kwargs={"server_default": func.now()})
+    accepted_at: Optional[datetime] = Field(default=None)
+    completed_at: Optional[datetime] = Field(default=None)
+
+    # Relationships
+    passenger: User = Relationship(
+        back_populates="hails",
+        sa_relationship_kwargs={"foreign_keys": "[HailRequest.passenger_id]"}
+    )
+    driver: Optional[User] = Relationship(
+        sa_relationship_kwargs={"foreign_keys": "[HailRequest.driver_id]"}
+    )

@@ -15,7 +15,7 @@ from sqlmodel import Session, select
 
 from database import create_db_and_tables, get_session
 from models import User, Vehicle, Route, Trip, Booking, TripStatus, UserRole
-from routers import auth, users, routes, vehicles, trips, bookings
+from routers import auth, users, routes, vehicles, trips, bookings, hails
 
 
 # ============================================================================
@@ -63,6 +63,7 @@ app.include_router(routes.router)
 app.include_router(vehicles.router)
 app.include_router(trips.router)
 app.include_router(bookings.router)
+app.include_router(hails.router)
 
 
 # ============================================================================

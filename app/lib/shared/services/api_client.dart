@@ -7,14 +7,43 @@ import '../models/user.dart';
 /// SmartTransport GH API Client
 /// Handles HTTP requests with automatic token injection
 class ApiClient {
+  static const String _defaultUrl = 'https://smarttransport-api.onrender.com';
+  static const String _customUrlKey = 'custom_server_url';
+  static String? _customUrl;
+  static final FlutterSecureStorage _staticStorage = const FlutterSecureStorage();
+
+  /// Load custom URL from storage (call once at app startup)
+  static Future<void> loadCustomUrl() async {
+    try {
+      _customUrl = await _staticStorage.read(key: _customUrlKey);
+    } catch (_) {}
+  }
+
+  /// Save a custom server URL
+  static Future<void> setCustomUrl(String url) async {
+    _customUrl = url.isNotEmpty ? url : null;
+    try {
+      if (url.isNotEmpty) {
+        await _staticStorage.write(key: _customUrlKey, value: url);
+      } else {
+        await _staticStorage.delete(key: _customUrlKey);
+      }
+    } catch (_) {}
+  }
+
+  /// Get the current server URL
+  static String get currentUrl => _customUrl ?? _defaultUrl;
+
   static String get _baseUrl {
-    // Production: set via --dart-define=API_URL=https://your-api.onrender.com
+    // User-configured URL takes priority
+    if (_customUrl != null) return _customUrl!;
+    // Build-time override
     const prodUrl = String.fromEnvironment('API_URL', defaultValue: '');
     if (prodUrl.isNotEmpty) return prodUrl;
-    // Web: use localhost
-    if (kIsWeb) return 'http://localhost:8000';
-    // Android: use host machine IP (works for both emulator and physical device on same WiFi)
-    if (Platform.isAndroid) return 'http://10.164.215.188:8000';
+    // Web: use Render production URL
+    if (kIsWeb) return _defaultUrl;
+    // Android: use Render production URL
+    if (Platform.isAndroid) return _defaultUrl;
     // iOS simulator / desktop: use localhost
     return 'http://localhost:8000';
   }
@@ -22,22 +51,24 @@ class ApiClient {
   String get baseUrl => _baseUrl;
   static const String _tokenKey = 'auth_token';
   static const String _userKey = 'user_data';
-  
+
   final Dio _dio;
   final FlutterSecureStorage _storage;
   String? _inMemoryToken;
-  
+
   ApiClient({String? baseUrl})
       : _dio = Dio(BaseOptions(
           baseUrl: baseUrl ?? _baseUrl,
-          connectTimeout: const Duration(seconds: 10),
-          receiveTimeout: const Duration(seconds: 10),
+          connectTimeout: const Duration(seconds: 60),
+          receiveTimeout: const Duration(seconds: 60),
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
           },
         )),
         _storage = const FlutterSecureStorage() {
+    // ignore: avoid_print
+    print('[ApiClient] Base URL: ${baseUrl ?? _baseUrl}');
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
@@ -50,30 +81,38 @@ class ApiClient {
           if (path.isNotEmpty && !path.endsWith('/') && !path.contains('?')) {
             options.path = '$path/';
           }
+          // ignore: avoid_print
+          print('[ApiClient] ${options.method} ${options.uri}');
           handler.next(options);
         },
+        onResponse: (response, handler) {
+          // ignore: avoid_print
+          print('[ApiClient] ${response.statusCode} ${response.requestOptions.uri}');
+          handler.next(response);
+        },
         onError: (error, handler) async {
+          // ignore: avoid_print
+          print('[ApiClient] ERROR: ${error.type} ${error.requestOptions.uri} ${error.message}');
           if (error.response?.statusCode == 401) {
             await clearTokens();
-            // Navigate to login would be handled by auth provider
           }
           handler.next(error);
         },
       ),
     );
   }
-  
+
   // ============================================================================
   // Token Management
   // ============================================================================
-  
+
   Future<void> saveToken(String token) async {
     _inMemoryToken = token;
     try {
       await _storage.write(key: _tokenKey, value: token);
     } catch (_) {}
   }
-  
+
   Future<String?> getToken() async {
     if (_inMemoryToken != null) return _inMemoryToken;
     try {
@@ -82,7 +121,7 @@ class ApiClient {
       return null;
     }
   }
-  
+
   Future<void> clearTokens() async {
     _inMemoryToken = null;
     try {
@@ -90,25 +129,23 @@ class ApiClient {
       await _storage.delete(key: _userKey);
     } catch (_) {}
   }
-  
+
   Future<void> saveUser(User user) async {
     await _storage.write(key: _userKey, value: user.toJson().toString());
   }
-  
+
   Future<User?> getSavedUser() async {
     final userData = await _storage.read(key: _userKey);
     if (userData != null) {
-      // Parse user from stored JSON
-      // In production, use proper JSON parsing
       return null;
     }
     return null;
   }
-  
+
   // ============================================================================
   // Dashboard Stats
   // ============================================================================
-  
+
   Future<Map<String, dynamic>> getDashboardStats() async {
     final response = await _dio.get('/dashboard/stats');
     return response.data;
@@ -117,7 +154,7 @@ class ApiClient {
   // ============================================================================
   // Auth Endpoints
   // ============================================================================
-  
+
   Future<Map<String, dynamic>> login(String phone, String password) async {
     final response = await _dio.post('/auth/login', data: {
       'phone': phone,
@@ -125,7 +162,7 @@ class ApiClient {
     });
     return response.data;
   }
-  
+
   Future<Map<String, dynamic>> register({
     required String name,
     required String phone,
@@ -142,97 +179,97 @@ class ApiClient {
     });
     return response.data;
   }
-  
+
   Future<Map<String, dynamic>> getMe() async {
     final response = await _dio.get('/auth/me');
     return response.data;
   }
-  
+
   // ============================================================================
   // User Endpoints
   // ============================================================================
-  
+
   Future<List<dynamic>> getUsers({String? role}) async {
     final queryParams = <String, dynamic>{};
     if (role != null) queryParams['role'] = role;
     final response = await _dio.get('/users', queryParameters: queryParams);
     return response.data;
   }
-  
+
   Future<Map<String, dynamic>> getUser(int userId) async {
     final response = await _dio.get('/users/$userId');
     return response.data;
   }
-  
+
   Future<Map<String, dynamic>> updateUser(int userId, Map<String, dynamic> data) async {
     final response = await _dio.patch('/users/$userId', data: data);
     return response.data;
   }
-  
+
   Future<void> deleteUser(int userId) async {
     await _dio.delete('/users/$userId');
   }
-  
+
   // ============================================================================
   // Route Endpoints
   // ============================================================================
-  
+
   Future<List<dynamic>> getRoutes() async {
     final response = await _dio.get('/routes');
     return response.data;
   }
-  
+
   Future<Map<String, dynamic>> getRoute(int routeId) async {
     final response = await _dio.get('/routes/$routeId');
     return response.data;
   }
-  
+
   Future<Map<String, dynamic>> createRoute(Map<String, dynamic> data) async {
     final response = await _dio.post('/routes', data: data);
     return response.data;
   }
-  
+
   Future<Map<String, dynamic>> updateRoute(int routeId, Map<String, dynamic> data) async {
     final response = await _dio.patch('/routes/$routeId', data: data);
     return response.data;
   }
-  
+
   Future<void> deleteRoute(int routeId) async {
     await _dio.delete('/routes/$routeId');
   }
-  
+
   // ============================================================================
   // Vehicle Endpoints
   // ============================================================================
-  
+
   Future<List<dynamic>> getVehicles() async {
     final response = await _dio.get('/vehicles');
     return response.data;
   }
-  
+
   Future<Map<String, dynamic>> getVehicle(int vehicleId) async {
     final response = await _dio.get('/vehicles/$vehicleId');
     return response.data;
   }
-  
+
   Future<Map<String, dynamic>> createVehicle(Map<String, dynamic> data) async {
     final response = await _dio.post('/vehicles', data: data);
     return response.data;
   }
-  
+
   Future<Map<String, dynamic>> updateVehicle(int vehicleId, Map<String, dynamic> data) async {
     final response = await _dio.patch('/vehicles/$vehicleId', data: data);
     return response.data;
   }
-  
+
   Future<void> deleteVehicle(int vehicleId) async {
     await _dio.delete('/vehicles/$vehicleId');
   }
-  
+
   // ============================================================================
   // Trip Endpoints
   // ============================================================================
-  
+
   Future<List<dynamic>> getTrips({String? status, int? routeId}) async {
     final params = <String, dynamic>{};
     if (status != null) params['status_filter'] = status;
@@ -240,26 +277,28 @@ class ApiClient {
     final response = await _dio.get('/trips', queryParameters: params);
     return response.data;
   }
-  
+
   Future<Map<String, dynamic>> getTrip(int tripId) async {
     final response = await _dio.get('/trips/$tripId');
     return response.data;
   }
-  
+
   Future<Map<String, dynamic>> createTrip(Map<String, dynamic> data) async {
     final response = await _dio.post('/trips', data: data);
     return response.data;
   }
-  
+
   Future<Map<String, dynamic>> updateTrip(int tripId, Map<String, dynamic> data) async {
     final response = await _dio.patch('/trips/$tripId', data: data);
     return response.data;
   }
-  
+
   Future<List<dynamic>> getTripLocations(int tripId) async {
     final response = await _dio.get('/trips/$tripId/locations');
     return response.data;
-  }  // ============================================================================
+  }
+
+  // ============================================================================
   // Booking Endpoints
   // ============================================================================
 

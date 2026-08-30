@@ -1,4 +1,6 @@
+import 'dart:developer' as developer;
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/user.dart';
 import 'api_client.dart';
@@ -6,13 +8,16 @@ import 'api_client.dart';
 /// Extract a user-friendly message from an exception (especially DioException).
 String _friendlyErrorMessage(Object e) {
   if (e is DioException) {
+    // Log the full error for debugging
+    developer.log('DioError: type=${e.type}, url=${e.requestOptions.uri}, message=${e.message}', name: 'ApiClient');
+    if (e.error != null) developer.log('DioError detail: ${e.error}', name: 'ApiClient');
     switch (e.type) {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:
       case DioExceptionType.receiveTimeout:
         return 'Connection timed out. Please check your network and try again.';
       case DioExceptionType.connectionError:
-        return 'Cannot reach the server. Please check your connection.';
+        return 'Cannot reach the server. URL: ${e.requestOptions.uri} — ${e.message ?? "unknown error"}';
       case DioExceptionType.badResponse:
         final statusCode = e.response?.statusCode;
         // Try to extract the backend's detail message from response body

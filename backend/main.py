@@ -5,9 +5,12 @@ FastAPI application entry point.
 """
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from sqlmodel import Session, select
 
 from database import create_db_and_tables, get_session
@@ -108,6 +111,26 @@ async def get_dashboard_stats(session: Session = Depends(get_session)):
         "total_passengers": total_passengers,
         "total_vehicles": total_vehicles,
     }
+
+
+# ============================================================================
+# Serve Flutter Web App
+# ============================================================================
+
+STATIC_DIR = Path(__file__).parent / "static"
+if STATIC_DIR.exists():
+    app.mount("/app", StaticFiles(directory=str(STATIC_DIR), html=True), name="flutter-web")
+
+    @app.get("/app", include_in_schema=False)
+    async def serve_web_app():
+        return FileResponse(str(STATIC_DIR / "index.html"))
+
+    @app.get("/app/{full_path:path}", include_in_schema=False)
+    async def serve_web_app_files(full_path: str):
+        file_path = STATIC_DIR / full_path
+        if file_path.is_file():
+            return FileResponse(str(file_path))
+        return FileResponse(str(STATIC_DIR / "index.html"))
 
 
 # ============================================================================

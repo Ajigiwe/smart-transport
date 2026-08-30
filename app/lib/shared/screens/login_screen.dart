@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/auth_provider.dart';
+import '../services/api_client.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/loading_route.dart';
@@ -80,6 +81,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined, color: AppColors.textSecondary),
+            onPressed: () => _showServerSettings(context),
+            tooltip: 'Server Settings',
+          ),
+        ],
+      ),
       body: showLoader
           ? _buildLoader()
           : SafeArea(
@@ -89,7 +101,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 child: Column(
                   children: [
-                    const SizedBox(height: 60),
                     // Logo
                     Image.asset(
                       'assets/logo.png',
@@ -243,6 +254,61 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
               ),
             ),
+    );
+  }
+
+  void _showServerSettings(BuildContext context) {
+    final controller = TextEditingController(text: ApiClient.currentUrl);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Server Settings'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Enter the backend server URL:',
+              style: AppTypography.bodySmall.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            TextField(
+              controller: controller,
+              decoration: InputDecoration(
+                hintText: 'https://smarttransport-api.onrender.com',
+                border: const OutlineInputBorder(),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.clear, size: 18),
+                  onPressed: () => controller.clear(),
+                ),
+              ),
+              keyboardType: TextInputType.url,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              'Leave default for Render, or enter your local IP (e.g. http://192.168.1.5:8000)',
+              style: AppTypography.labelSmall.copyWith(
+                color: AppColors.textTertiary,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              await ApiClient.setCustomUrl(controller.text.trim());
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
     );
   }
 

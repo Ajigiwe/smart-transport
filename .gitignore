@@ -5,10 +5,13 @@ __pycache__/
 *.so
 *.egg-info/
 dist/
-build/
 venv/
 .env
 *.db
+
+# Don't ignore backend static (Flutter web build)
+!backend/static/
+!backend/static/**
 
 # Flutter
 app/.dart_tool/

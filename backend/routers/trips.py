@@ -278,6 +278,7 @@ async def get_trip_details(
             "id": driver.id,
             "name": driver.name,
             "phone": driver.phone,
+            "is_online": driver.is_online,
         } if driver else None,
         "vehicle": {
             "id": vehicle.id,

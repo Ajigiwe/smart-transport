@@ -40,6 +40,11 @@ class _DriverDashboardState extends ConsumerState<DriverDashboard> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
+      // Load user's online status
+      try {
+        final me = await _apiClient.getMe();
+        _isOnline = me['is_online'] == true;
+      } catch (_) {}
       final trips = await _apiClient.getTrips();
       _completedTrips = trips.where((t) => t['status'] == 'completed').length;
       _totalEarnings = 0.0;
@@ -155,12 +160,16 @@ class _DriverDashboardState extends ConsumerState<DriverDashboard> {
                   ),
                   Switch(
                     value: _isOnline,
-                    onChanged: (value) {
+                  onChanged: (value) async {
+                    try {
+                      await _apiClient.setOnlineStatus(value);
                       setState(() {
                         _isOnline = value;
                       });
-                      // TODO: Update vehicle status via API
-                    },
+                    } catch (_) {
+                      // Revert on failure
+                    }
+                  },
                     activeColor: AppColors.success,
                   ),
                 ],

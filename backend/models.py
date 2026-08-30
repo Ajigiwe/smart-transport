@@ -57,6 +57,7 @@ class User(SQLModel, table=True):
     password_hash: str = Field(max_length=255)
     role: UserRole = Field(default=UserRole.PASSENGER)
     is_active: bool = Field(default=True)
+    is_online: bool = Field(default=False)
     created_at: Optional[datetime] = Field(default=None, sa_column_kwargs={"server_default": func.now()})
 
     # Relationships

@@ -118,3 +118,26 @@ async def delete_user(
     user.is_active = False
     session.add(user)
     session.commit()
+
+
+# ============================================================================
+# Driver Online Status
+# ============================================================================
+
+@router.patch("/me/online", response_model=UserResponse)
+async def set_online_status(
+    body: dict,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Set driver online status."""
+    if current_user.role != UserRole.DRIVER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only drivers can toggle online status"
+        )
+    current_user.is_online = body.get("is_online", not current_user.is_online)
+    session.add(current_user)
+    session.commit()
+    session.refresh(current_user)
+    return current_user

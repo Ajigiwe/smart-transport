@@ -16,7 +16,7 @@ from auth import (
     get_current_user
 )
 from database import get_session
-from models import User, UserRole
+from models import User, UserRole, Vehicle, VehicleStatus
 from schemas import UserRegister, UserLogin, Token, UserResponse
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -60,6 +60,19 @@ async def register(user_data: UserRegister, session: Session = Depends(get_sessi
         created_at=datetime.utcnow(),
     )
     session.add(new_user)
+    session.flush()  # get ID
+
+    # Auto-create a vehicle for new drivers
+    if user_data.role == UserRole.DRIVER:
+        vehicle_count = len(session.exec(select(Vehicle)).all())
+        new_vehicle = Vehicle(
+            plate_number=f"GR-{1000 + new_user.id:04d}-{str(new_user.id).zfill(2)}",
+            capacity=14,
+            driver_id=new_user.id,
+            status=VehicleStatus.ACTIVE,
+        )
+        session.add(new_vehicle)
+
     session.commit()
     session.refresh(new_user)
     return new_user

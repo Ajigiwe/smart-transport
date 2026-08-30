@@ -371,6 +371,11 @@ class ApiClient {
     return response.data;
   }
 
+  Future<Map<String, dynamic>> setOnlineStatus(bool isOnline) async {
+    final response = await _dio.patch('/users/me/online', data: {'is_online': isOnline});
+    return response.data;
+  }
+
   // ============================================================================
   // WebSocket Connection
   // ============================================================================
